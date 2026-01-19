@@ -1,0 +1,201 @@
+// Declare variables for getting the xml file for the XSL transformation (folio_xml) and to load the image in IIIF on the page in question (number).
+let tei = document.getElementById("folio");
+let tei_xml = tei.innerHTML;
+let extension = ".xml";
+let folio_xml = tei_xml.concat(extension);
+let page = document.getElementById("page");
+let pageN = page.innerHTML;
+let number = Number(pageN);
+
+// Loading the IIIF manifest
+var mirador = Mirador.viewer({
+  "id": "my-mirador",
+  "manifests": {
+    "https://iiif.bodleian.ox.ac.uk/iiif/manifest/53fd0f29-d482-46e1-aa9d-37829b49987d.json": {
+      provider: "Bodleian Library, University of Oxford"
+    }
+  },
+  "window": {
+    allowClose: false,
+    allowWindowSideBar: true,
+    allowTopMenuButton: false,
+    allowMaximize: false,
+    hideWindowTitle: true,
+    panels: {
+      info: false,
+      attribution: false,
+      canvas: true,
+      annotations: false,
+      search: false,
+      layers: false,
+    }
+  },
+  "workspaceControlPanel": {
+    enabled: false,
+  },
+  "windows": [
+    {
+      loadedManifest: "https://iiif.bodleian.ox.ac.uk/iiif/manifest/53fd0f29-d482-46e1-aa9d-37829b49987d.json",
+      canvasIndex: number,
+      thumbnailNavigationPosition: 'off'
+    }
+  ]
+});
+
+
+// function to transform the text encoded in TEI with the xsl stylesheet "Frankenstein_text.xsl", this will apply the templates and output the text in the html <div id="text">
+function documentLoader() {
+
+    Promise.all([
+      fetch(folio_xml).then(response => response.text()),
+      fetch("Frankenstein_text.xsl").then(response => response.text())
+    ])
+    .then(function ([xmlString, xslString]) {
+      var parser = new DOMParser();
+      var xml_doc = parser.parseFromString(xmlString, "text/xml");
+      var xsl_doc = parser.parseFromString(xslString, "text/xml");
+
+      var xsltProcessor = new XSLTProcessor();
+      xsltProcessor.importStylesheet(xsl_doc);
+      var resultDocument = xsltProcessor.transformToFragment(xml_doc, document);
+
+      var criticalElement = document.getElementById("text");
+      criticalElement.innerHTML = ''; // Clear existing content
+      criticalElement.appendChild(resultDocument);
+    })
+    .catch(function (error) {
+      console.error("Error loading documents:", error);
+    });
+  }
+  
+// function to transform the metadate encoded in teiHeader with the xsl stylesheet "Frankenstein_meta.xsl", this will apply the templates and output the text in the html <div id="stats">
+  function statsLoader() {
+
+    Promise.all([
+      fetch(folio_xml).then(response => response.text()),
+      fetch("Frankenstein_meta.xsl").then(response => response.text())
+    ])
+    .then(function ([xmlString, xslString]) {
+      var parser = new DOMParser();
+      var xml_doc = parser.parseFromString(xmlString, "text/xml");
+      var xsl_doc = parser.parseFromString(xslString, "text/xml");
+
+      var xsltProcessor = new XSLTProcessor();
+      xsltProcessor.importStylesheet(xsl_doc);
+      var resultDocument = xsltProcessor.transformToFragment(xml_doc, document);
+
+      var criticalElement = document.getElementById("stats");
+      criticalElement.innerHTML = ''; // Clear existing content
+      criticalElement.appendChild(resultDocument);
+    })
+    .catch(function (error) {
+      console.error("Error loading documents:", error);
+    });
+  }
+
+  // Initial document load
+  documentLoader();
+  statsLoader();
+  // Event listener for sel1 change
+  function selectHand(event) {
+    const maryEls = Array.from(document.querySelectorAll(".MWS"));
+    const percyEls = Array.from(document.querySelectorAll(".PBS"));
+  
+    const reset = (els) => {
+      els.forEach((el) => {
+        el.style.backgroundColor = "";
+        el.style.color = "";
+        el.style.fontWeight = "";
+      });
+    };
+  
+    const highlightMary = (els) => {
+      els.forEach((el) => {
+        el.style.color = "blue";
+        el.style.fontWeight = "600";
+      });
+    };
+  
+    const highlightPercy = (els) => {
+      els.forEach((el) => {
+        el.style.color = "red";
+        el.style.fontWeight = "600";
+      });
+    };
+  
+    // Reset everything first
+    reset(maryEls);
+    reset(percyEls);
+  
+    if (event.target.value === "both") {
+      // Show both hands with default styling (black)
+      // (reset already did this)
+    } else if (event.target.value === "Mary") {
+      highlightMary(maryEls);
+      // Percy stays default (black)
+    } else if (event.target.value === "Percy") {
+      highlightPercy(percyEls);
+      // Mary stays default (black)
+    }
+  }
+  
+  /**
+   * b) Toggle deletions by clicking a button
+   */
+  function toggleDeletions() {
+    const deletions = document.querySelectorAll("del");
+    deletions.forEach((d) => {
+      d.style.display = d.style.display === "none" ? "inline" : "none";
+    });
+  }
+  
+  /**
+   * c) EXTRA: Reading text mode
+   */
+  let readingModeOn = false;
+  
+  function toggleReadingMode() {
+    readingModeOn = !readingModeOn;
+  
+    const deletions = document.querySelectorAll("del");
+    const supraAdds = document.querySelectorAll(".supraAdd");
+    const marginAdds = document.querySelectorAll(".marginAdd");
+  
+    if (readingModeOn) {
+      // Hide deletions
+      deletions.forEach((d) => {
+        d.style.display = "none";
+      });
+  
+      // Make supralinear additions display like normal inline text
+      supraAdds.forEach((a) => {
+        a.style.verticalAlign = "baseline";
+        a.style.fontSize = "inherit";
+        a.style.position = "static";
+      });
+  
+    
+      marginAdds.forEach((m) => {
+        m.style.display = "inline";
+      });
+    } else {
+      // Restore deletions
+      deletions.forEach((d) => {
+        d.style.display = "";
+      });
+  
+      // Restore supralinear styling 
+      supraAdds.forEach((a) => {
+        a.style.verticalAlign = "";
+        a.style.fontSize = "";
+        a.style.position = "";
+      });
+  
+      // Restore margin additions
+      marginAdds.forEach((m) => {
+        m.style.display = "";
+      });
+    }
+  }
+// write another function that will toggle the display of the deletions by clicking on a button
+// EXTRA: write a function that will display the text as a reading text by clicking on a button or another dropdown list, meaning that all the deletions are removed and that the additions are shown inline (not in superscript)
